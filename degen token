@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "hardhat/console.sol";
+
+contract degenToken is ERC20, Ownable, ERC20Burnable {
+    event LogMessage(string message);
+
+    struct Jacket {
+        string model;
+        uint256 price;
+        uint256 stock;
+    }
+
+    mapping(string => Jacket) public jackets;
+    mapping(address => uint256) public userTokenBalances;
+
+    constructor() ERC20("DEGEN", "DGN") Ownable(msg.sender) {
+        jackets["Leather"] = Jacket("Leather", 100, 10);
+        jackets["Denim"] = Jacket("Denim", 50, 20);
+        jackets["Bomber"] = Jacket("Bomber", 30, 15);
+        jackets["Windbreaker"] = Jacket("Windbreaker", 10, 25);
+    }
+
+    function mintTokens(address recipientAddress, uint256 tokenAmount) public onlyOwner {
+        _mint(recipientAddress, tokenAmount);
+    }
+
+    function burnTokens(uint256 tokenAmount) public payable {
+        require(balanceOf(msg.sender) >= tokenAmount, "Insufficient balance to burn tokens");
+        _burn(msg.sender, tokenAmount);
+        emit LogMessage("Burned tokens");
+    }
+
+    function transferTokens(address recipientAddress, uint256 tokenAmount) external {
+        require(balanceOf(msg.sender) >= tokenAmount, "Insufficient balance to transfer tokens");
+        _transfer(msg.sender, recipientAddress, tokenAmount);
+    }
+
+    function redeemJacket(string memory jacketModel, uint256 quantity) external payable {
+        require(bytes(jacketModel).length > 0, "Invalid jacket model");
+        require(quantity > 0, "Quantity must be greater than zero");
+        require(balanceOf(msg.sender) >= jackets[jacketModel].price * quantity, "Insufficient funds to redeem jacket");
+        
+        Jacket storage jacket = jackets[jacketModel];
+        require(jacket.stock >= quantity, "Insufficient jacket quantity");
+
+        _burn(msg.sender, jacket.price * quantity);
+        userTokenBalances[msg.sender] += quantity;
+        jacket.stock -= quantity;
+
+        emit LogMessage("Redeemed Jacket");
+    }
+
+    // New function: Check user token balance
+    function getUserTokenBalance() external view returns (uint256) {
+        return userTokenBalances[msg.sender];
+    }
+    
+    function addJacketStock(string memory jacketModel, uint256 quantity) external onlyOwner {
+        require(jackets[jacketModel].price != 0, "Invalid jacket model");
+        jackets[jacketModel].stock += quantity;
+    }
+    
+    function modifyJacketStock(string memory jacketModel, uint256 newQuantity) external onlyOwner {
+        require(jackets[jacketModel].price != 0, "Invalid jacket model");
+        jackets[jacketModel].stock = newQuantity;
+    }
+}
